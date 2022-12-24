@@ -1,0 +1,33 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+/roadmap_db_test
+/backend/__tests__/__snapshots__
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+.history
+
+# local env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE's
+.idea
+tsconfig.tsbuildinfo
