@@ -1,5 +1,5 @@
 import express from 'express';
-import redis from 'redis';
+import cors from 'cors';
 import { createServer } from 'http';
 
 import rateLimit from 'express-rate-limit';
@@ -23,6 +23,7 @@ const limiter = rateLimit({
 
 // Apply the rate limiting middleware to all requests
 app.use(limiter);
+app.use(cors());
 
 // cors
 
