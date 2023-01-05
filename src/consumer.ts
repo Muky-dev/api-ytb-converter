@@ -2,14 +2,15 @@ import { Worker, Job } from 'bullmq';
 import path from 'path';
 import fs from 'fs';
 import ytdl from 'ytdl-core';
-import IORedis from 'ioredis';
-import config from './config';
+import ffmpeg from 'fluent-ffmpeg';
 
 console.log('Worker started!');
 
-const downloaderWorker = new Worker('download', async (job: Job) => {
+const downloaderWorker = new Worker('convert', async (job: Job) => {
   try {
     const { url, format, quality } = job.data;
+    console.log('format: ' + format);
+    console.log('quality: ' + quality);
     console.log(job.id + ' started!');
 
     const parsedUrl = url!.toString();
@@ -23,18 +24,34 @@ const downloaderWorker = new Worker('download', async (job: Job) => {
     const title = info.videoDetails.title;
     const videoFormat = ytdl.chooseFormat(info.formats, { quality: quality });
 
-    const video = ytdl(parsedUrl, { format: videoFormat });
-    const filePath = path.join(__dirname, '../', 'downloads', `${title}.${format}`);
-    const file = fs.createWriteStream(filePath);
-    video.on('progress', (_, downloaded, total) => {
-      const percent = downloaded / total;
-      job.updateProgress({ roomId: videoId, progress: percent * 100 });
-    });
-    video.pipe(file);
-    // progress
+    // Video Stream
 
-    return { file: filePath, roomId: videoId };
+    const filePath = path.join(__dirname, '../', 'downloads', `${title}[${quality}].${format}`);
+    const file = fs.createWriteStream(filePath);
+
+    await new Promise((resolve) => {
+      const stream = ytdl(parsedUrl, { format: videoFormat })
+        .pipe(file)
+        .on('progress', async (_, downloaded, total) => {
+          console.log('progress: ' + Math.round((downloaded / total) * 100) + '%');
+          const progress = Math.round((downloaded / total) * 100);
+          await job.updateProgress({ roomId: videoId, progress });
+        })
+
+        .on('finish', () => {
+          console.log('finished downloading!');
+          resolve(stream);
+        });
+    });
+
+    console.log('finished!');
+
+    return { url: filePath, roomId: videoId };
   } catch (error) {
     console.log(error);
   }
+});
+
+downloaderWorker.on('completed', async (job) => {
+  console.log(job.id + ' completed!');
 });

@@ -1,12 +1,11 @@
 import { Router } from 'express';
 import ytdl from 'ytdl-core';
 import { createClient } from 'redis';
-import { Queue } from 'bullmq';
 
 const router = Router();
 // setup controller
 
-router.get('/video-info', async (req, res) => {
+router.get('/info', async (req, res) => {
   try {
     const { url, mediaType } = req.query;
 
@@ -35,7 +34,7 @@ router.get('/video-info', async (req, res) => {
     }
 
     // Validate media type
-    if (mediaType !== 'audioonly' && mediaType !== 'videoandaudio') {
+    if (mediaType !== 'audioonly' && mediaType !== 'videoonly') {
       return res.status(400).json({ error: 'Invalid media type' });
     }
 
@@ -44,7 +43,7 @@ router.get('/video-info', async (req, res) => {
     const cached = await redisClient.get(`${parsedUrl}-${mediaType}`);
 
     if (cached) {
-      //return res.status(200).json(JSON.parse(cached));
+      return res.status(200).json(JSON.parse(cached));
     }
 
     const isValidUrl = ytdl.validateURL(parsedUrl);
@@ -55,13 +54,30 @@ router.get('/video-info', async (req, res) => {
 
     const videoInfo = await ytdl.getInfo(parsedUrl);
     const videoTitle = videoInfo.videoDetails.title;
-    const videoThumbnail = videoInfo.videoDetails.thumbnails[0].url;
+    const videoThumbnail = videoInfo.videoDetails.thumbnails.at(-1)?.url;
 
-    const videoFormats = ytdl.filterFormats(videoInfo.formats, mediaType);
+    // Get highest bitrate from video formats
+    const videoFormats = [
+      ...ytdl
+        .filterFormats(videoInfo.formats, mediaType)
+        .filter((format) =>
+          mediaType === 'videoonly' ? format.container === 'mp4' : format.container === 'webm',
+        )
+        .reduce(
+          (acc, format) =>
+            format.container === 'mp4' &&
+            (!acc.has(format.quality) || acc.get(format.quality).bitrate < format.bitrate!)
+              ? acc.set(format.quality, format)
+              : acc,
+          new Map(),
+        )
+        .values(),
+    ];
 
     const response = { title: videoTitle, thumbnail: videoThumbnail, formats: videoFormats };
 
     await redisClient.set(`${parsedUrl}-${mediaType}`, JSON.stringify(response), { EX: 10 });
+    console.log('Caching response...');
     await redisClient.disconnect();
 
     return res.status(200).json(response);

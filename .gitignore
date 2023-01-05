@@ -31,3 +31,5 @@ yarn-error.log*
 # IDE's
 .idea
 tsconfig.tsbuildinfo
+
+/downloads

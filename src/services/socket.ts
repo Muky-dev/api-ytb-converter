@@ -1,8 +1,7 @@
-import http from 'http';
 import { Server } from 'socket.io';
 import ytdl from 'ytdl-core';
 
-import { ValidateAndQueueDownload } from '../producer';
+import { ValidateAndQueueConvert } from '../producer';
 
 let instance: Server | null = null;
 
@@ -25,7 +24,7 @@ class SocketService {
           if (!data.url) throw new Error('Invalid URL');
           const videoId = ytdl.getVideoID(data.url);
           await socket.join(videoId);
-          await ValidateAndQueueDownload(data);
+          await ValidateAndQueueConvert(data);
         } catch (error) {
           console.log(error);
           socket.emit('error', error);
